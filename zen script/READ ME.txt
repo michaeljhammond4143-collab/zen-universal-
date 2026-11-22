@@ -1,0 +1,135 @@
+# MINI ZEN V4.3
+### Custom 5-Point Pattern Editor for Cronus Zen
+
+Welcome to Mini Zen V4.3!
+
+Mini Zen is a custom GPC script for Cronus Zen featuring a five-point pattern editor, adjustable horizontal and vertical values, five presets, an OLED graph, and adjustable pattern timing.
+
+The goal is to give users control over their own patterns directly from the Cronus Zen OLED screen without needing to edit the code every time.
+
+---
+
+## FEATURES
+
+- Five independent pattern presets.
+- Five editable points per preset.
+- OLED graph with grid.
+- Independent horizontal (H) and vertical (V) values for every point.
+- Adjustable values in 0.1 increments.
+- Adjustable pattern duration from 4 to 20 seconds.
+- Automatic saving of pattern edits.
+- RGB lighting.
+- OLED status display.
+- Straight-line default pattern for fresh presets.
+
+## GETTING STARTED
+
+1. Open the script in Cronus Zen's GPC editor.
+2. Compile the script.
+3. Load it onto your Cronus Zen.
+4. Connect your controller.
+5. Open the OLED display to access the editor.
+
+Fresh presets start with five points arranged in a straight horizontal line.
+
+Existing saved patterns are retained when loading the script.
+
+---
+
+## BUTTON CONTROLS
+
+### Preset controls
+- **LB + Left:** Previous preset.
+- **LB + Right:** Next preset.
+- **LB tap:** Toggle the script on or off.
+
+### Pattern editor
+- **RB:** Enter or exit editing.
+- **Left / Right:** Select a pattern point.
+- **Y:** Cycle through editing modes.
+- **D-pad Up:** Increase the selected value.
+- **D-pad Down:** Decrease the selected value.
+
+### Editing modes
+
+**M0 — X Position**
+Adjusts the horizontal position of a point on the OLED graph.
+
+**M1 — Y Position**
+Adjusts the vertical position of a point on the OLED graph.
+
+**M2 — Horizontal (H)**
+Adjusts the horizontal compensation value for the selected point.
+
+**M3 — Vertical (V)**
+Adjusts the vertical compensation value for the selected point.
+
+**M4 — Pattern Duration**
+Adjusts how long one complete pattern cycle takes.
+
+- Up: Increase duration by one second.
+- Down: Decrease duration by one second.
+- Minimum: 4 seconds.
+- Maximum: 20 seconds.
+
+---
+
+## UNDERSTANDING THE OLED GRAPH
+
+The OLED graph visually represents the five pattern points.
+
+- **P1:** First point.
+- **P2:** Second point.
+- **P3:** Third point.
+- **P4:** Fourth point.
+- **P5:** Fifth point.
+
+The grid helps users see where each point sits.
+
+M0 and M1 change the visual position of points on the graph. M2 and M3 change the actual horizontal and vertical compensation values.
+
+This distinction is important: moving a point on the graph does not automatically change its H/V compensation.
+
+---
+
+## HOW THE PATTERN WORKS
+
+The script uses five points to create a pattern.
+
+It interpolates the H/V values between consecutive points over the pattern cycle.
+
+The pattern progresses through:
+
+P1 → P2 → P3 → P4 → P5 → P1
+
+The duration setting controls how long the complete cycle takes.
+
+When the firing input is released, the pattern timer resets so the next activation starts from the beginning.
+
+---
+
+## SAVING YOUR SETTINGS
+
+decimal's are not saved 
+
+Pattern point values and preset data are saved using the script's existing persistent storage.
+
+Changes are automatically saved as points are edited.
+
+The M4 duration setting is temporary and resets to four seconds when the Cronus Zen is restarted.
+
+---
+
+## IMPORTANT NOTES
+
+- Mini Zen is a community-made script.
+- The script does not guarantee a particular weapon pattern or accuracy.
+- Different games, weapons, sensitivities and controller settings can produce different results.
+- Users should test their own settings and make adjustments.
+- Always follow the rules of the games and platforms where you use the script.
+
+### THANK YOU
+
+Thanks for checking out Mini Zen V4.3.
+
+Feel free to customise your presets, experiment with the editor and make the script your own.

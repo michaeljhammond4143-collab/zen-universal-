@@ -1,0 +1,792 @@
+/* ********************* GPC FILE RECOVERED ********************* */
+
+// ========================================
+// MINI ZEN V4.2
+// CUSTOM 5-POINT PATTERN EDITOR
+// FIVE PRESETS | OLED | RGB | AUTO SAVE
+// INDEPENDENT H/V VALUES PER POINT
+// TAP = 0.1 | HOLD = 1.0
+// ========================================
+
+int enabled = TRUE;
+int preset = 1;
+int lb_used = FALSE;
+int editing = FALSE;
+
+int vertical = 0;
+int horizontal = 0;
+
+// Editing
+int selected_point = 0;
+int edit_mode = 0;
+
+// 0 = Point X
+// 1 = Point Y
+// 2 = Horizontal Pull
+// 3 = Vertical Pull
+
+// Pattern timing
+int pattern_time = 0;
+int pattern_segment = 0;
+int pattern_progress = 0;
+
+int pattern_x = 0;
+int pattern_y = 0;
+int pattern_h = 0;
+int pattern_v = 0;
+
+// Display values
+int display_v = 0;
+int display_h = 0;
+
+// Storage
+int index_a;
+int index_b;
+int packed_a;
+int packed_b;
+int temp_value;
+
+int stored_h;
+int stored_v;
+
+// Hold adjustment timers
+int repeat_up_timer = 0;
+int repeat_down_timer = 0;
+
+int up_hold_triggered = FALSE;
+int down_hold_triggered = FALSE;
+
+// Fractional output accumulation
+int h_remainder = 0;
+int v_remainder = 0;
+
+int output_h_tenths;
+int output_v_tenths;
+int output_h;
+int output_v;
+
+int i;
+int j;
+
+// Five presets, five points each
+int point_x[25];
+int point_y[25];
+int point_h[25];
+int point_v[25];
+
+
+// ========================================
+// OLED DISPLAY
+// ========================================
+
+function show_display() {
+
+    cls_oled(OLED_BLACK);
+
+    index_a = ((preset - 1) * 5) + selected_point;
+
+    display_v = point_v[index_a];
+    display_h = point_h[index_a];
+
+    // PRESET / POINT / MODE
+    putc_oled(1, 80);
+    putc_oled(2, 48 + preset);
+    putc_oled(3, 32);
+    putc_oled(4, 80);
+    putc_oled(5, 84);
+    putc_oled(6, 49 + selected_point);
+    putc_oled(7, 32);
+    putc_oled(8, 77);
+    putc_oled(9, 48 + edit_mode);
+
+    puts_oled(0, 0, OLED_FONT_SMALL, 9, OLED_WHITE);
+
+    // VERTICAL VALUE
+    putc_oled(1, 86);
+    putc_oled(2, 58);
+
+    if(display_v < 0) {
+        putc_oled(3, 45);
+    }
+    else {
+        putc_oled(3, 43);
+    }
+
+    temp_value = abs(display_v);
+
+    putc_oled(4, 48 + (temp_value / 1000));
+    putc_oled(5, 48 + ((temp_value / 100) % 10));
+    putc_oled(6, 48 + ((temp_value / 10) % 10));
+    putc_oled(7, 46);
+    putc_oled(8, 48 + (temp_value % 10));
+
+    puts_oled(0, 10, OLED_FONT_SMALL, 8, OLED_WHITE);
+
+    // HORIZONTAL VALUE
+    putc_oled(1, 72);
+    putc_oled(2, 58);
+
+    if(display_h < 0) {
+        putc_oled(3, 45);
+    }
+    else {
+        putc_oled(3, 43);
+    }
+
+    temp_value = abs(display_h);
+
+    putc_oled(4, 48 + (temp_value / 1000));
+    putc_oled(5, 48 + ((temp_value / 100) % 10));
+    putc_oled(6, 48 + ((temp_value / 10) % 10));
+    putc_oled(7, 46);
+    putc_oled(8, 48 + (temp_value % 10));
+
+    puts_oled(0, 18, OLED_FONT_SMALL, 8, OLED_WHITE);
+
+    // DRAW PATTERN LINES
+    for(i = 0; i < 4; i = i + 1) {
+
+        index_a = ((preset - 1) * 5) + i;
+        index_b = index_a + 1;
+
+        line_oled(
+            4 + (point_x[index_a] * 120 / 100),
+            25 + (point_y[index_a] * 34 / 100),
+            4 + (point_x[index_b] * 120 / 100),
+            25 + (point_y[index_b] * 34 / 100),
+            1,
+            OLED_WHITE
+        );
+    }
+
+    // DRAW FIVE POINTS
+    for(i = 0; i < 5; i = i + 1) {
+
+        index_a = ((preset - 1) * 5) + i;
+
+        rect_oled(
+            3 + (point_x[index_a] * 120 / 100),
+            24 + (point_y[index_a] * 34 / 100),
+            3,
+            3,
+            1,
+            OLED_WHITE
+        );
+    }
+
+    // SELECTED POINT
+    index_a = ((preset - 1) * 5) + selected_point;
+
+    rect_oled(
+        2 + (point_x[index_a] * 120 / 100),
+        23 + (point_y[index_a] * 34 / 100),
+        5,
+        5,
+        0,
+        OLED_WHITE
+    );
+}
+
+
+// ========================================
+// SAVE BASE V/H
+// ========================================
+
+function save_current() {
+
+    set_pvar(
+        SPVAR_51 + ((preset - 1) * 2),
+        vertical
+    );
+
+    set_pvar(
+        SPVAR_52 + ((preset - 1) * 2),
+        horizontal
+    );
+}
+
+
+// ========================================
+// SAVE SELECTED POINT ONLY
+// ========================================
+
+function save_selected_point() {
+
+    index_a = ((preset - 1) * 5) + selected_point;
+    index_b = ((preset - 1) * 10) + (selected_point * 2);
+
+    // SAVE WHOLE-NUMBER PORTION
+    stored_h = point_h[index_a] / 10;
+    stored_v = point_v[index_a] / 10;
+
+    packed_a =
+        1
+        + point_x[index_a]
+        + (point_y[index_a] * 128)
+        + ((stored_h + 100) % 2 * 16384);
+
+    packed_b =
+        ((stored_h + 100) / 2)
+        + ((stored_v + 100) * 128);
+
+    set_pvar(SPVAR_1 + index_b, packed_a);
+    set_pvar(SPVAR_1 + index_b + 1, packed_b);
+}
+
+
+// ========================================
+// LOAD PRESET
+// ========================================
+
+function load_current() {
+
+    vertical = get_pvar(
+        SPVAR_51 + ((preset - 1) * 2),
+        0, 100, 0
+    );
+
+    horizontal = get_pvar(
+        SPVAR_52 + ((preset - 1) * 2),
+        -100, 100, 0
+    );
+
+    for(j = 0; j < 5; j = j + 1) {
+
+        index_a = ((preset - 1) * 5) + j;
+        index_b = ((preset - 1) * 10) + (j * 2);
+
+        packed_a = get_pvar(
+            SPVAR_1 + index_b,
+            0, 29285, 0
+        );
+
+        packed_b = get_pvar(
+            SPVAR_1 + index_b + 1,
+            0, 25700, 0
+        );
+
+        temp_value = packed_a - 1;
+
+        point_x[index_a] = temp_value % 128;
+        point_y[index_a] = (temp_value / 128) % 128;
+
+        point_h[index_a] =
+            (
+                (((packed_b % 128) * 2)
+                + (temp_value / 16384)) - 100
+            ) * 10;
+
+        point_v[index_a] =
+            ((packed_b / 128) - 100) * 10;
+
+        // DEFAULT S SHAPE
+        if(packed_a == 0 && packed_b == 0) {
+
+            if(j == 0) {
+                point_x[index_a] = 10;
+                point_y[index_a] = 10;
+            }
+
+            if(j == 1) {
+                point_x[index_a] = 30;
+                point_y[index_a] = 80;
+            }
+
+            if(j == 2) {
+                point_x[index_a] = 50;
+                point_y[index_a] = 50;
+            }
+
+            if(j == 3) {
+                point_x[index_a] = 70;
+                point_y[index_a] = 20;
+            }
+
+            if(j == 4) {
+                point_x[index_a] = 90;
+                point_y[index_a] = 90;
+            }
+
+            point_h[index_a] = 0;
+            point_v[index_a] = 0;
+        }
+    }
+
+    show_display();
+}
+
+
+// ========================================
+// INITIAL SETTINGS
+// ========================================
+
+init {
+
+    preset = get_pvar(SPVAR_61, 1, 5, 1);
+
+    // LOAD ALL FIVE PRESETS
+    for(i = 0; i < 5; i = i + 1) {
+
+        for(j = 0; j < 5; j = j + 1) {
+
+            index_a = (i * 5) + j;
+            index_b = (i * 10) + (j * 2);
+
+            packed_a = get_pvar(
+                SPVAR_1 + index_b,
+                0, 29285, 0
+            );
+
+            packed_b = get_pvar(
+                SPVAR_1 + index_b + 1,
+                0, 25700, 0
+            );
+
+            temp_value = packed_a - 1;
+
+            point_x[index_a] = temp_value % 128;
+            point_y[index_a] = (temp_value / 128) % 128;
+
+            point_h[index_a] =
+                (
+                    (((packed_b % 128) * 2)
+                    + (temp_value / 16384)) - 100
+                ) * 10;
+
+            point_v[index_a] =
+                ((packed_b / 128) - 100) * 10;
+
+            if(packed_a == 0 && packed_b == 0) {
+
+                if(j == 0) {
+                    point_x[index_a] = 10;
+                    point_y[index_a] = 10;
+                }
+
+                if(j == 1) {
+                    point_x[index_a] = 30;
+                    point_y[index_a] = 80;
+                }
+
+                if(j == 2) {
+                    point_x[index_a] = 50;
+                    point_y[index_a] = 50;
+                }
+
+                if(j == 3) {
+                    point_x[index_a] = 70;
+                    point_y[index_a] = 20;
+                }
+
+                if(j == 4) {
+                    point_x[index_a] = 90;
+                    point_y[index_a] = 90;
+                }
+
+                point_h[index_a] = 0;
+                point_v[index_a] = 0;
+            }
+        }
+    }
+
+    load_current();
+}
+
+
+// ========================================
+// MAIN SCRIPT
+// ========================================
+
+main {
+
+    editing = get_ival(XB1_RB);
+
+    // LED
+    if(enabled) {
+        set_rgb(0, 255, 0);
+    }
+    else {
+        set_rgb(255, 0, 0);
+    }
+
+    // LB DETECTION
+    if(event_press(XB1_LB)) {
+        lb_used = FALSE;
+    }
+
+    // PREVIOUS PRESET
+    if(get_val(XB1_LB) && event_press(XB1_LEFT)) {
+
+        lb_used = TRUE;
+
+        preset = preset - 1;
+
+        if(preset < 1) {
+            preset = 5;
+        }
+
+        set_pvar(SPVAR_61, preset);
+
+        load_current();
+
+        set_val(XB1_LB, 0);
+        set_val(XB1_LEFT, 0);
+    }
+
+    // NEXT PRESET
+    if(get_val(XB1_LB) && event_press(XB1_RIGHT)) {
+
+        lb_used = TRUE;
+
+        preset = preset + 1;
+
+        if(preset > 5) {
+            preset = 1;
+        }
+
+        set_pvar(SPVAR_61, preset);
+
+        load_current();
+
+        set_val(XB1_LB, 0);
+        set_val(XB1_RIGHT, 0);
+    }
+
+    // LB TOGGLE
+    if(event_release(XB1_LB)) {
+
+        if(!lb_used) {
+            enabled = !enabled;
+        }
+    }
+
+    // ====================================
+    // PATTERN EDITING
+    // ====================================
+
+    if(enabled && editing) {
+
+        // CHANGE EDIT MODE
+        if(event_press(XB1_Y)) {
+
+            edit_mode = edit_mode + 1;
+
+            if(edit_mode > 3) {
+                edit_mode = 0;
+            }
+
+            show_display();
+        }
+
+        // SELECT NEXT POINT
+        if(event_press(XB1_RIGHT)) {
+
+            selected_point = selected_point + 1;
+
+            if(selected_point > 4) {
+                selected_point = 0;
+            }
+
+            show_display();
+        }
+
+        // SELECT PREVIOUS POINT
+        if(event_press(XB1_LEFT)) {
+
+            selected_point = selected_point - 1;
+
+            if(selected_point < 0) {
+                selected_point = 4;
+            }
+
+            show_display();
+        }
+
+        index_a = ((preset - 1) * 5) + selected_point;
+
+        // =================================
+        // ADJUST UP
+        // =================================
+
+        if(edit_mode < 2) {
+
+            if(event_press(XB1_UP)) {
+
+                if(edit_mode == 0) {
+                    point_x[index_a] =
+                        clamp(point_x[index_a] + 1, 0, 100);
+                }
+
+                if(edit_mode == 1) {
+                    point_y[index_a] =
+                        clamp(point_y[index_a] - 1, 0, 100);
+                }
+
+                save_selected_point();
+                show_display();
+            }
+        }
+        else {
+
+            if(event_press(XB1_UP)) {
+                repeat_up_timer = 0;
+                up_hold_triggered = FALSE;
+            }
+
+            if(get_val(XB1_UP)) {
+
+                repeat_up_timer = repeat_up_timer + get_rtime();
+
+                if(repeat_up_timer >= 250) {
+
+                    repeat_up_timer = 0;
+                    up_hold_triggered = TRUE;
+
+                    if(edit_mode == 2) {
+                        point_h[index_a] =
+                            clamp(point_h[index_a] + 10, -1000, 1000);
+                    }
+
+                    if(edit_mode == 3) {
+                        point_v[index_a] =
+                            clamp(point_v[index_a] + 10, -1000, 1000);
+                    }
+
+                    save_selected_point();
+                    show_display();
+                }
+            }
+
+            if(event_release(XB1_UP)) {
+
+                if(!up_hold_triggered) {
+
+                    if(edit_mode == 2) {
+                        point_h[index_a] =
+                            clamp(point_h[index_a] + 1, -1000, 1000);
+                    }
+
+                    if(edit_mode == 3) {
+                        point_v[index_a] =
+                            clamp(point_v[index_a] + 1, -1000, 1000);
+                    }
+
+                    save_selected_point();
+                    show_display();
+                }
+
+                repeat_up_timer = 0;
+                up_hold_triggered = FALSE;
+            }
+        }
+
+        // =================================
+        // ADJUST DOWN
+        // =================================
+
+        if(edit_mode < 2) {
+
+            if(event_press(XB1_DOWN)) {
+
+                if(edit_mode == 0) {
+                    point_x[index_a] =
+                        clamp(point_x[index_a] - 1, 0, 100);
+                }
+
+                if(edit_mode == 1) {
+                    point_y[index_a] =
+                        clamp(point_y[index_a] + 1, 0, 100);
+                }
+
+                save_selected_point();
+                show_display();
+            }
+        }
+        else {
+
+            if(event_press(XB1_DOWN)) {
+                repeat_down_timer = 0;
+                down_hold_triggered = FALSE;
+            }
+
+            if(get_val(XB1_DOWN)) {
+
+                repeat_down_timer = repeat_down_timer + get_rtime();
+
+                if(repeat_down_timer >= 250) {
+
+                    repeat_down_timer = 0;
+                    down_hold_triggered = TRUE;
+
+                    if(edit_mode == 2) {
+                        point_h[index_a] =
+                            clamp(point_h[index_a] - 10, -1000, 1000);
+                    }
+
+                    if(edit_mode == 3) {
+                        point_v[index_a] =
+                            clamp(point_v[index_a] - 10, -1000, 1000);
+                    }
+
+                    save_selected_point();
+                    show_display();
+                }
+            }
+
+            if(event_release(XB1_DOWN)) {
+
+                if(!down_hold_triggered) {
+
+                    if(edit_mode == 2) {
+                        point_h[index_a] =
+                            clamp(point_h[index_a] - 1, -1000, 1000);
+                    }
+
+                    if(edit_mode == 3) {
+                        point_v[index_a] =
+                            clamp(point_v[index_a] - 1, -1000, 1000);
+                    }
+
+                    save_selected_point();
+                    show_display();
+                }
+
+                repeat_down_timer = 0;
+                down_hold_triggered = FALSE;
+            }
+        }
+
+        // BLOCK EDITING BUTTONS
+        set_val(XB1_RB, 0);
+        set_val(XB1_Y, 0);
+        set_val(XB1_UP, 0);
+        set_val(XB1_DOWN, 0);
+        set_val(XB1_LEFT, 0);
+        set_val(XB1_RIGHT, 0);
+    }
+
+    // ====================================
+    // NORMAL V/H ADJUSTMENT
+    // ====================================
+
+    if(enabled && !get_val(XB1_LB) && !editing) {
+
+        if(event_press(XB1_UP)) {
+            vertical = clamp(vertical + 1, 0, 100);
+            save_current();
+            show_display();
+        }
+
+        if(event_press(XB1_DOWN)) {
+            vertical = clamp(vertical - 1, 0, 100);
+            save_current();
+            show_display();
+        }
+
+        if(event_press(XB1_RIGHT)) {
+            horizontal = clamp(horizontal + 1, -100, 100);
+            save_current();
+            show_display();
+        }
+
+        if(event_press(XB1_LEFT)) {
+            horizontal = clamp(horizontal - 1, -100, 100);
+            save_current();
+            show_display();
+        }
+    }
+
+    // ====================================
+    // PATTERN MOVEMENT
+    // ====================================
+
+    if(enabled && get_val(XB1_LT) && get_val(XB1_RT)) {
+
+        pattern_time = pattern_time + get_rtime();
+
+        if(pattern_time >= 4000) {
+            pattern_time = pattern_time - 4000;
+        }
+
+        pattern_segment = pattern_time / 1000;
+        pattern_progress = pattern_time % 1000;
+
+        index_a = ((preset - 1) * 5) + pattern_segment;
+        index_b = index_a + 1;
+
+        // INTERPOLATE POSITION
+        pattern_x =
+            point_x[index_a]
+            + ((point_x[index_b] - point_x[index_a])
+            * pattern_progress / 1000);
+
+        pattern_y =
+            point_y[index_a]
+            + ((point_y[index_b] - point_y[index_a])
+            * pattern_progress / 1000);
+
+        // INTERPOLATE INDEPENDENT H VALUES
+        pattern_h =
+            point_h[index_a]
+            + ((point_h[index_b] - point_h[index_a])
+            * pattern_progress / 1000);
+
+        // INTERPOLATE INDEPENDENT V VALUES
+        pattern_v =
+            point_v[index_a]
+            + ((point_v[index_b] - point_v[index_a])
+            * pattern_progress / 1000);
+
+        // FRACTIONAL VERTICAL OUTPUT
+        output_v_tenths =
+            (get_ival(XB1_RY) + vertical) * 10
+            + pattern_v
+            + v_remainder;
+
+        output_v = output_v_tenths / 10;
+
+        v_remainder =
+            output_v_tenths - (output_v * 10);
+
+        // FRACTIONAL HORIZONTAL OUTPUT
+        output_h_tenths =
+            (get_ival(XB1_RX) + horizontal) * 10
+            + pattern_h
+            + h_remainder;
+
+        output_h = output_h_tenths / 10;
+
+        h_remainder =
+            output_h_tenths - (output_h * 10);
+
+        set_val(
+            XB1_RY,
+            clamp(output_v, -100, 100)
+        );
+
+        set_val(
+            XB1_RX,
+            clamp(output_h, -100, 100)
+        );
+
+        show_display();
+
+        // MOVING POSITION MARKER
+        rect_oled(
+            2 + (pattern_x * 120 / 100),
+            23 + (pattern_y * 34 / 100),
+            5,
+            5,
+            1,
+            OLED_WHITE
+        );
+    }
+    else {
+
+        // RELEASE RT TO STOP AND RESET
+        pattern_time = 0;
+
+        h_remainder = 0;
+        v_remainder = 0;
+    }
+}
